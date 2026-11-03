@@ -1,0 +1,109 @@
+#!/bin/bash
+# Läuft beim ersten Start des Webservers (cloud-init). Log: /var/log/web-init.log
+set -euo pipefail
+exec > >(tee -a /var/log/web-init.log) 2>&1
+export HOME=/root
+export DEBIAN_FRONTEND=noninteractive
+
+# Bis zu 5 Minuten auf den apt-Lock warten statt abzubrechen
+APT="apt-get -o DPkg::Lock::Timeout=300"
+$APT update
+$APT install -y nginx nodejs npm
+
+# ---------- Hello-World-Seite ----------
+cat > /var/www/html/index.html <<HTML
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Hello World</title></head>
+<body style="font-family: sans-serif; margin: 3rem;">
+  <h1>Hello World!</h1>
+  <p>Ausgeliefert von Webserver <b>$(hostname)</b> hinter dem OVH Load Balancer.</p>
+  <p><a href="/db">Datenbank-Verbindung testen &rarr;</a></p>
+</body>
+</html>
+HTML
+
+# ---------- Kleine Node-App für die DB-Verbindung ----------
+mkdir -p /opt/helloapp
+cd /opt/helloapp
+npm init -y >/dev/null
+npm install --omit=dev express@4 mssql@11
+
+cat > /opt/helloapp/server.js <<'JS'
+const express = require('express');
+const sql = require('mssql');
+
+const config = {
+  server: process.env.DB_HOST,
+  user: 'webapp',
+  password: process.env.DB_PASSWORD,
+  database: 'HelloDB',
+  options: { encrypt: true, trustServerCertificate: true }
+};
+
+const app = express();
+
+app.get('/db', async (req, res) => {
+  try {
+    const pool = await sql.connect(config);
+    const msg = await pool.request().query('SELECT TOP 1 message FROM dbo.Greetings');
+    const ver = await pool.request().query('SELECT @@VERSION AS v');
+    res.send(
+      '<h1>' + msg.recordset[0].message + '</h1>' +
+      '<p>Gelesen von SQL Server auf ' + process.env.DB_HOST + '</p>' +
+      '<pre>' + ver.recordset[0].v + '</pre>' +
+      '<p><a href="/">&larr; zurück</a></p>'
+    );
+  } catch (err) {
+    res.status(500).send('<h1>DB-Fehler</h1><pre>' + err.message + '</pre>');
+  }
+});
+
+app.listen(3000, '127.0.0.1', () => console.log('helloapp läuft auf :3000'));
+JS
+
+cat > /etc/helloapp.env <<ENV
+DB_HOST=${db_host}
+DB_PASSWORD=${app_db_password}
+ENV
+chmod 600 /etc/helloapp.env
+
+cat > /etc/systemd/system/helloapp.service <<'UNIT'
+[Unit]
+Description=Hello World DB App
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/helloapp.env
+WorkingDirectory=/opt/helloapp
+ExecStart=/usr/bin/node /opt/helloapp/server.js
+Restart=always
+User=www-data
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+# ---------- nginx: statische Seite + /db an die Node-App ----------
+cat > /etc/nginx/sites-available/default <<'NGINX'
+server {
+    listen 80 default_server;
+    root /var/www/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location /db {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+    }
+}
+NGINX
+
+systemctl daemon-reload
+systemctl enable --now helloapp
+systemctl restart nginx
+echo "Web-Init fertig."
