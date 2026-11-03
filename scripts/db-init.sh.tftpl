@@ -1,0 +1,74 @@
+#!/bin/bash
+# Läuft beim ersten Start der DB-Instanz (cloud-init).
+# Installiert SQL Server 2025 komplett, richtet ihn ein und legt HelloDB an.
+# Log: /var/log/db-init.log  (zusätzlich im Konsolen-Log der Instanz)
+set -euo pipefail
+exec > >(tee -a /var/log/db-init.log) 2>&1
+export DEBIAN_FRONTEND=noninteractive
+
+SA_PW='${sa_password}'
+APP_PW='${app_db_password}'
+SQLCMD=/opt/mssql-tools18/bin/sqlcmd
+
+# Bis zu 5 Minuten auf den apt-Lock warten statt abzubrechen
+APT="apt-get -o DPkg::Lock::Timeout=300"
+
+# ---------- 1. Microsoft-Repositories einbinden ----------
+$APT update
+$APT install -y curl ca-certificates
+
+curl -fsSL -o /tmp/packages-microsoft-prod.deb \
+  https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb
+dpkg -i /tmp/packages-microsoft-prod.deb
+rm -f /tmp/packages-microsoft-prod.deb
+
+curl -fsSL -o /etc/apt/sources.list.d/mssql-server-2025.list \
+  https://packages.microsoft.com/config/ubuntu/24.04/mssql-server-2025.list
+
+# ---------- 2. SQL Server 2025 + Tools installieren ----------
+$APT update
+$APT install -y mssql-server
+ACCEPT_EULA=Y $APT install -y msodbcsql18 mssql-tools18 unixodbc-dev
+
+# ---------- 3. SQL Server einrichten ----------
+MSSQL_SA_PASSWORD="$SA_PW" MSSQL_PID='${mssql_pid}' \
+  /opt/mssql/bin/mssql-conf -n setup accept-eula
+
+systemctl enable --now mssql-server
+
+# Warten, bis SQL Server Verbindungen annimmt
+for i in $(seq 1 60); do
+  if $SQLCMD -S localhost -U sa -P "$SA_PW" -C -Q "SELECT 1" >/dev/null 2>&1; then
+    echo "SQL Server ist bereit."
+    break
+  fi
+  echo "Warte auf SQL Server ($i) ..."
+  sleep 5
+done
+
+# ---------- 4. Datenbank, Tabelle und App-User anlegen ----------
+cat > /root/init.sql <<SQL
+IF DB_ID('HelloDB') IS NULL CREATE DATABASE HelloDB;
+GO
+USE HelloDB;
+GO
+IF OBJECT_ID('dbo.Greetings') IS NULL
+BEGIN
+  CREATE TABLE dbo.Greetings (id INT IDENTITY PRIMARY KEY, message NVARCHAR(200) NOT NULL);
+  INSERT INTO dbo.Greetings (message) VALUES (N'Hello World aus SQL Server 2025!');
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'webapp')
+  CREATE LOGIN webapp WITH PASSWORD = '$APP_PW', CHECK_POLICY = OFF;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'webapp')
+BEGIN
+  CREATE USER webapp FOR LOGIN webapp;
+  ALTER ROLE db_datareader ADD MEMBER webapp;
+END
+GO
+SQL
+
+$SQLCMD -S localhost -U sa -P "$SA_PW" -C -i /root/init.sql
+rm -f /root/init.sql
+echo "DB-Init fertig."
