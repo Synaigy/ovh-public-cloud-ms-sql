@@ -1,3 +1,4 @@
+# ---------- Zugangsdaten (kommen aus GitHub Secrets) ----------
 variable "ovh_service_name" {
   description = "Service name for ovh project"
   type        = string
@@ -34,6 +35,7 @@ variable "openstack_user" {
   sensitive   = true
 }
 
+# ---------- Allgemein ----------
 variable "bucket_name" {
   description = "bucket name"
   type        = string
@@ -57,12 +59,19 @@ variable "ssh_public_key" {
   type        = string
 }
 
+variable "enable_ssh" {
+  description = "true = Webserver bekommt eine Public IP für SSH (Debugging)"
+  type        = bool
+  default     = false
+}
+
 variable "ssh_allowed_cidr" {
   description = "Von wo SSH auf den Webserver erlaubt ist (am besten deine eigene IP/32)"
   type        = string
   default     = "0.0.0.0/0"
 }
 
+# ---------- Images und Flavors ----------
 variable "db_image_name" {
   description = "Name des Snapshots mit SQL Server 2025"
   type        = string
@@ -85,6 +94,7 @@ variable "web_flavor" {
   default = "d2-4"
 }
 
+# ---------- SQL Server ----------
 variable "mssql_pid" {
   description = "SQL-Server-2025-Edition (Express, StandardDeveloper, EnterpriseDeveloper, ...)"
   type        = string
@@ -113,6 +123,7 @@ variable "app_db_password" {
   }
 }
 
+# ---------- Netz: feste private IPs ----------
 # Feste private IPs, damit der Webserver die DB direkt findet
 variable "subnet_cidr" {
   type    = string
