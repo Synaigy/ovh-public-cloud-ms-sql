@@ -13,7 +13,7 @@ data "openstack_images_image_v2" "ubuntu" {
   most_recent = true
 }
 
-# ==================== Database (b3-8, SQL Server 2025 per Skript) ====================
+# ==================== Database (b3-8, SQL Server 2025 installed by script) ====================
 resource "openstack_networking_port_v2" "db" {
   name               = "${var.prefix}-db-port"
   network_id         = openstack_networking_network_v2.private.id
