@@ -69,7 +69,7 @@ variable "ssh_allowed_cidr" {
 variable "db_image_name" {
   description = "Name des Snapshots mit SQL Server 2025"
   type        = string
-  default     = "mssql-2025-base"
+  default     = "Ubuntu 24.04"
 }
 
 variable "web_image_name" {
