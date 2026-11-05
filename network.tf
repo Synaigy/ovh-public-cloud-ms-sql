@@ -3,7 +3,7 @@ data "openstack_networking_network_v2" "ext_net" {
   external = true
 }
 
-# Privates Netz für Webserver, Datenbank und Load Balancer
+# Private network for webserver, database and load balancer
 resource "openstack_networking_network_v2" "private" {
   name           = "${var.prefix}-net"
   admin_state_up = true
@@ -23,7 +23,7 @@ resource "openstack_networking_subnet_v2" "private" {
   }
 }
 
-# Router/Gateway: Internetzugang (apt, npm) und Floating IPs
+# Router/Gateway: Internet access (apt, npm) and floating IPs
 resource "openstack_networking_router_v2" "gw" {
   name                = "${var.prefix}-router"
   admin_state_up      = true
