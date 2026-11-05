@@ -25,7 +25,7 @@ resource "openstack_networking_secgroup_rule_v2" "web_ssh" {
   remote_ip_prefix  = var.ssh_allowed_cidr
 }
 
-# ---------- Datenbank ----------
+# ---------- Database ----------
 resource "openstack_networking_secgroup_v2" "db" {
   name        = "${var.prefix}-db-sg"
   description = "MSSQL nur vom Webserver, SSH nur aus dem privaten Netz"
