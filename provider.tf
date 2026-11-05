@@ -1,6 +1,6 @@
 terraform {
   backend "s3" {
-    bucket = var.bucket_name
+    bucket = "bucket name"
     key    = "terraform.tfstate"
     region = "de"
     endpoints = {
