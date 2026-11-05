@@ -1,16 +1,16 @@
 #!/bin/bash
-# Läuft beim ersten Start des Webservers (cloud-init). Log: /var/log/web-init.log
+# Runs on first boot of the web server (cloud-init). Log: /var/log/web-init.log
 set -euo pipefail
 exec > >(tee -a /var/log/web-init.log) 2>&1
 export HOME=/root
 export DEBIAN_FRONTEND=noninteractive
 
-# Bis zu 5 Minuten auf den apt-Lock warten statt abzubrechen
+# Wait up to 5 minutes for the apt lock instead of failing
 APT="apt-get -o DPkg::Lock::Timeout=300"
 $APT update
 $APT install -y nginx nodejs npm
 
-# ---------- Hello-World-Seite ----------
+# ---------- Hello World page ----------
 cat > /var/www/html/index.html <<HTML
 <!doctype html>
 <html lang="de">
@@ -23,7 +23,7 @@ cat > /var/www/html/index.html <<HTML
 </html>
 HTML
 
-# ---------- Kleine Node-App für die DB-Verbindung ----------
+# ---------- Small Node app for the database connection ----------
 mkdir -p /opt/helloapp
 cd /opt/helloapp
 npm init -y >/dev/null
@@ -85,7 +85,7 @@ User=www-data
 WantedBy=multi-user.target
 UNIT
 
-# ---------- nginx: statische Seite + /db an die Node-App ----------
+# ---------- nginx: static page + /db proxied to the Node app ----------
 cat > /etc/nginx/sites-available/default <<'NGINX'
 server {
     listen 80 default_server;
