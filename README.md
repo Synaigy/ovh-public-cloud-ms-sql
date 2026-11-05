@@ -32,14 +32,13 @@ After deployment:
 2. [Prerequisites](#prerequisites)
 3. [Setup on OVHcloud](#setup-on-ovhcloud)
 4. [Configuration](#configuration)
-5. [Deploying with GitHub Actions](#deploying-with-github-actions)
-6. [Deploying locally](#deploying-locally)
-7. [What happens on first boot](#what-happens-on-first-boot)
-8. [Accessing the servers (SSH)](#accessing-the-servers-ssh)
-9. [Troubleshooting](#troubleshooting)
-10. [Destroying everything](#destroying-everything)
-11. [Security notes](#security-notes)
-12. [Costs and licensing](#costs-and-licensing)
+5. [Deploying](#deploying)
+6. [What happens on first boot](#what-happens-on-first-boot)
+7. [Accessing the servers (SSH)](#accessing-the-servers-ssh)
+8. [Troubleshooting](#troubleshooting)
+9. [Destroying everything](#destroying-everything)
+10. [Security notes](#security-notes)
+11. [Costs and licensing](#costs-and-licensing)
 
 ---
 
@@ -56,16 +55,14 @@ After deployment:
 | `output.tf` | Website URL, DB test URL, SSH commands |
 | `scripts/db-init.sh.tftpl` | cloud-init script: installs SQL Server 2025, creates `HelloDB`, table `Greetings` and login `webapp` |
 | `scripts/web-init.sh.tftpl` | cloud-init script: installs nginx, Node.js, the Hello World page and a small Node app for `/db` |
-| `.github/workflows/` | `tf-plan` (on push / PR) and `tf-apply-manual` (manual trigger) |
 
 ---
 
 ## Prerequisites
 
 - An **OVHcloud Public Cloud project**.
-- **Terraform ≥ 1.6** (the workflows use 1.15).
+- **Terraform ≥ 1.6**.
 - Optional: the **OpenStack CLI** (`pip install python-openstackclient`) for troubleshooting.
-- For GitHub Actions: a runner with internet access. The workflows use `runs-on: self-hosted`. Change this to `ubuntu-latest` if you want GitHub-hosted runners.
 
 ---
 
@@ -167,71 +164,9 @@ openstack --os-region-name DE1 image list --public | grep -i "24.04"
 
 ---
 
-## Deploying with GitHub Actions
+## Deploying
 
-### 1. Secrets
-
-Go to **Settings → Secrets and variables → Actions → New repository secret** and add:
-
-| Secret | Value |
-|---|---|
-| `ovh_application_key` | OVH API application key |
-| `ovh_application_secret` | OVH API application secret |
-| `ovh_consumer_key` | OVH API consumer key |
-| `ovh_service_name` | Public Cloud project ID |
-| `openstack_user` | OpenStack username |
-| `openstack_password` | OpenStack password |
-| `s3_access_key` | Object Storage S3 access key (Terraform state) |
-| `s3_secret_key` | Object Storage S3 secret key (Terraform state) |
-| `sa_password` | SQL Server `sa` password |
-| `app_db_password` | Password for the `webapp` SQL login |
-
-### 2. Variables
-
-Under **Variables → New repository variable** add:
-
-| Variable | Value |
-|---|---|
-| `SSH_PUBLIC_KEY` | Contents of your public SSH key |
-
-### 3. Workflow environment
-
-Both workflows pass the values to Terraform as `TF_VAR_*` environment variables (Terraform reads them automatically):
-
-```yaml
-env:
-  TF_IN_AUTOMATION: "true"
-  TF_INPUT: "false"
-  # OVH credentials
-  TF_VAR_ovh_application_key: ${{ secrets.ovh_application_key }}
-  TF_VAR_ovh_application_secret: ${{ secrets.ovh_application_secret }}
-  TF_VAR_ovh_consumer_key: ${{ secrets.ovh_consumer_key }}
-  TF_VAR_ovh_service_name: ${{ secrets.ovh_service_name }}
-  # OpenStack credentials
-  TF_VAR_openstack_user: ${{ secrets.openstack_user }}
-  TF_VAR_openstack_password: ${{ secrets.openstack_password }}
-  # SQL Server passwords
-  TF_VAR_sa_password: ${{ secrets.sa_password }}
-  TF_VAR_app_db_password: ${{ secrets.app_db_password }}
-  # SSH key
-  TF_VAR_ssh_public_key: ${{ vars.SSH_PUBLIC_KEY }}
-  # Terraform state (S3)
-  AWS_ACCESS_KEY_ID: ${{ secrets.s3_access_key }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.s3_secret_key }}
-```
-
-> **Environment secrets:** if you store the secrets in a GitHub *Environment* instead of the repository, add `environment: <name>` to the job. Otherwise the secrets are empty and Terraform reports `No value for required variable`.
-
-### 4. Run
-
-- **`tf-plan`** runs on every push to `main` and on pull requests: `init`, `fmt -check`, `validate`, `plan`.
-- **`tf-apply-manual`** is started manually: **Actions → tf-apply-manual → Run workflow**. It runs `plan` and `apply -auto-approve`.
-
-The `fmt -check` step fails if the code is not formatted. Run `terraform fmt -recursive` before pushing.
-
----
-
-## Deploying locally
+Terraform reads every environment variable named `TF_VAR_<name>` as the value of variable `<name>`. The S3 backend reads the state credentials from `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`.
 
 ```bash
 # Terraform state credentials
@@ -255,7 +190,21 @@ terraform apply
 terraform output
 ```
 
-Alternatively, put the variables into a `terraform.tfvars` file. **Never commit it** (see `.gitignore` below).
+Alternatively, put the variables into a `terraform.tfvars` file in the project folder, which Terraform loads automatically. **Never commit it** (see `.gitignore` below).
+
+```hcl
+ovh_service_name       = "..."
+ovh_application_key    = "..."
+ovh_application_secret = "..."
+ovh_consumer_key       = "..."
+openstack_user         = "..."
+openstack_password     = "..."
+ssh_public_key         = "ssh-ed25519 AAAA... you@host"
+sa_password            = "..."
+app_db_password        = "..."
+```
+
+> **Running it in CI (e.g. GitHub Actions, GitLab CI):** store the values as CI secrets, expose them to the job as the `TF_VAR_*` and `AWS_*` environment variables shown above, and run `terraform init` and `terraform apply -auto-approve`. Because the state is stored in Object Storage, local runs and CI runs share the same state.
 
 ---
 
@@ -290,9 +239,10 @@ Until the database is ready, `/db` returns a database error. `/` works as soon a
 
 By default no server has a public IP apart from the load balancer. To enable SSH, set:
 
-```yaml
-TF_VAR_enable_ssh: "true"
-TF_VAR_ssh_allowed_cidr: "your.public.ip/32"
+```bash
+export TF_VAR_enable_ssh=true
+export TF_VAR_ssh_allowed_cidr="your.public.ip/32"
+terraform apply
 ```
 
 After `apply`, `terraform output` shows the commands:
@@ -345,7 +295,7 @@ The image name does not exist in this region. List the images (see [Region](#reg
 
 **`No value for required variable`**
 
-The secret or `TF_VAR_*` variable is missing or empty. Check the names and, for Environment secrets, the `environment:` line in the workflow.
+A required variable is missing or empty. Check that the `TF_VAR_*` environment variable is exported in the same shell (or that the value is in `terraform.tfvars`) and that the name matches exactly.
 
 **`Variables may not be used here` in `provider.tf`**
 
@@ -357,17 +307,10 @@ Variables are not allowed in the `backend` block. See [Object Storage bucket](#3
 
 All resources (instances, load balancer, floating IPs, network) are billed while they exist.
 
-Locally, with the same environment variables as for deploying:
+With the same environment variables as for deploying:
 
 ```bash
 terraform destroy
-```
-
-There is no destroy workflow yet. If you want one, copy `tf-apply-manual` and replace the apply step with:
-
-```yaml
-- name: Terraform Destroy
-  run: terraform destroy -auto-approve -input=false
 ```
 
 The state bucket and the OVH users are not managed by Terraform and must be deleted manually if no longer needed.
