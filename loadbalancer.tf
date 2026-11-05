@@ -42,7 +42,7 @@ resource "openstack_lb_member_v2" "web" {
   depends_on = [openstack_compute_instance_v2.web]
 }
 
-# Öffentliche IP für den Load Balancer
+# Public IP for the load balancer
 resource "openstack_networking_floatingip_v2" "lb" {
   pool       = data.openstack_networking_network_v2.ext_net.name
   depends_on = [openstack_networking_router_interface_v2.gw]
