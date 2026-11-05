@@ -1,7 +1,7 @@
 #!/bin/bash
-# Läuft beim ersten Start der DB-Instanz (cloud-init).
-# Installiert SQL Server 2025 komplett, richtet ihn ein und legt HelloDB an.
-# Log: /var/log/db-init.log  (zusätzlich im Konsolen-Log der Instanz)
+# Runs on first boot of the database instance (cloud-init).
+# Installs SQL Server 2025, configures it and creates HelloDB.
+# Log: /var/log/db-init.log  (also written to the instance console log)
 set -euo pipefail
 exec > >(tee -a /var/log/db-init.log) 2>&1
 export DEBIAN_FRONTEND=noninteractive
@@ -10,10 +10,10 @@ SA_PW='${sa_password}'
 APP_PW='${app_db_password}'
 SQLCMD=/opt/mssql-tools18/bin/sqlcmd
 
-# Bis zu 5 Minuten auf den apt-Lock warten statt abzubrechen
+# Wait up to 5 minutes for the apt lock instead of failing
 APT="apt-get -o DPkg::Lock::Timeout=300"
 
-# ---------- 1. Microsoft-Repositories einbinden ----------
+# ---------- 1. Add Microsoft repositories ----------
 $APT update
 $APT install -y curl ca-certificates
 
@@ -25,18 +25,18 @@ rm -f /tmp/packages-microsoft-prod.deb
 curl -fsSL -o /etc/apt/sources.list.d/mssql-server-2025.list \
   https://packages.microsoft.com/config/ubuntu/24.04/mssql-server-2025.list
 
-# ---------- 2. SQL Server 2025 + Tools installieren ----------
+# ---------- 2. Install SQL Server 2025 + tools ----------
 $APT update
 $APT install -y mssql-server
 ACCEPT_EULA=Y $APT install -y msodbcsql18 mssql-tools18 unixodbc-dev
 
-# ---------- 3. SQL Server einrichten ----------
+# ---------- 3. Configure SQL Server ----------
 MSSQL_SA_PASSWORD="$SA_PW" MSSQL_PID='${mssql_pid}' \
   /opt/mssql/bin/mssql-conf -n setup accept-eula
 
 systemctl enable --now mssql-server
 
-# Warten, bis SQL Server Verbindungen annimmt
+# Wait until SQL Server accepts connections
 for i in $(seq 1 60); do
   if $SQLCMD -S localhost -U sa -P "$SA_PW" -C -Q "SELECT 1" >/dev/null 2>&1; then
     echo "SQL Server ist bereit."
@@ -46,7 +46,7 @@ for i in $(seq 1 60); do
   sleep 5
 done
 
-# ---------- 4. Datenbank, Tabelle und App-User anlegen ----------
+# ---------- 4. Create database, table and app user ----------
 cat > /root/init.sql <<SQL
 IF DB_ID('HelloDB') IS NULL CREATE DATABASE HelloDB;
 GO
