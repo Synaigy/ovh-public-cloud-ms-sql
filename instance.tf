@@ -13,7 +13,7 @@ data "openstack_images_image_v2" "ubuntu" {
   most_recent = true
 }
 
-# ==================== Datenbank (b3-8, SQL Server 2025 per Skript) ====================
+# ==================== Database (b3-8, SQL Server 2025 per Skript) ====================
 resource "openstack_networking_port_v2" "db" {
   name               = "${var.prefix}-db-port"
   network_id         = openstack_networking_network_v2.private.id
@@ -74,7 +74,7 @@ resource "openstack_compute_instance_v2" "web" {
   depends_on = [openstack_networking_router_interface_v2.gw]
 }
 
-# Optionale Public IP am Webserver – nur für SSH (enable_ssh = true)
+# Optional public IP for webserver – just for SSH (enable_ssh = true)
 resource "openstack_networking_floatingip_v2" "web" {
   count      = var.enable_ssh ? 1 : 0
   pool       = data.openstack_networking_network_v2.ext_net.name
