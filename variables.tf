@@ -1,4 +1,4 @@
-# ---------- Zugangsdaten (kommen aus GitHub Secrets) ----------
+# ---------- Credentials (from GitHub Secrets) ----------
 variable "ovh_service_name" {
   description = "Service name for ovh project"
   type        = string
@@ -35,13 +35,7 @@ variable "openstack_user" {
   sensitive   = true
 }
 
-# ---------- Allgemein ----------
-variable "bucket_name" {
-  description = "bucket name"
-  type        = string
-  sensitive   = true
-}
-
+# ---------- Main ----------
 variable "region" {
   description = "OVH-Region (muss die Region sein, in der dein mssql-Image liegt)"
   type        = string
@@ -71,7 +65,7 @@ variable "ssh_allowed_cidr" {
   default     = "0.0.0.0/0"
 }
 
-# ---------- Images und Flavors ----------
+# ---------- Images and Flavors ----------
 variable "db_image_name" {
   description = "Name des Snapshots mit SQL Server 2025"
   type        = string
@@ -123,7 +117,7 @@ variable "app_db_password" {
   }
 }
 
-# ---------- Netz: feste private IPs ----------
+# ---------- Networks: static private IPs ----------
 # Feste private IPs, damit der Webserver die DB direkt findet
 variable "subnet_cidr" {
   type    = string
