@@ -39,7 +39,7 @@ variable "openstack_user" {
 variable "region" {
   description = "OVH-Region (muss die Region sein, in der dein mssql-Image liegt)"
   type        = string
-  default     = "SBG7"
+  default     = "DE1"
 }
 
 variable "prefix" {
