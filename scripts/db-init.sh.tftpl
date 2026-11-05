@@ -39,10 +39,10 @@ systemctl enable --now mssql-server
 # Wait until SQL Server accepts connections
 for i in $(seq 1 60); do
   if $SQLCMD -S localhost -U sa -P "$SA_PW" -C -Q "SELECT 1" >/dev/null 2>&1; then
-    echo "SQL Server ist bereit."
+    echo "SQL Server is ready."
     break
   fi
-  echo "Warte auf SQL Server ($i) ..."
+  echo "Waiting for SQL Server ($i) ..."
   sleep 5
 done
 
@@ -55,7 +55,7 @@ GO
 IF OBJECT_ID('dbo.Greetings') IS NULL
 BEGIN
   CREATE TABLE dbo.Greetings (id INT IDENTITY PRIMARY KEY, message NVARCHAR(200) NOT NULL);
-  INSERT INTO dbo.Greetings (message) VALUES (N'Hello World aus SQL Server 2025!');
+  INSERT INTO dbo.Greetings (message) VALUES (N'Hello World from SQL Server 2025!');
 END
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'webapp')
@@ -71,4 +71,4 @@ SQL
 
 $SQLCMD -S localhost -U sa -P "$SA_PW" -C -i /root/init.sql
 rm -f /root/init.sql
-echo "DB-Init fertig."
+echo "DB init done."
