@@ -1,6 +1,6 @@
 terraform {
   backend "s3" {
-    bucket = "bucket name"
+    bucket = "your-bucket-name"
     key    = "terraform.tfstate"
     region = "de"
     endpoints = {
@@ -21,9 +21,6 @@ terraform {
       source  = "terraform-provider-openstack/openstack"
       version = "3.4.0"
     }
-    null = {
-      source = "hashicorp/null"
-    }
   }
 }
 
@@ -35,11 +32,11 @@ provider "ovh" {
 }
 
 provider "openstack" {
-  auth_url         = "https://auth.cloud.ovh.net/v3" 
-  domain_name      = "default"                       
+  auth_url         = "https://auth.cloud.ovh.net/v3"
+  domain_name      = "default"
   user_name        = var.openstack_user
   password         = var.openstack_password
   tenant_id        = var.ovh_service_name
   user_domain_name = "Default"
-  region           = "DE1"
+  region           = var.region
 }
