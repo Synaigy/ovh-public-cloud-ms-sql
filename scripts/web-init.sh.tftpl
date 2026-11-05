@@ -13,12 +13,12 @@ $APT install -y nginx nodejs npm
 # ---------- Hello World page ----------
 cat > /var/www/html/index.html <<HTML
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head><meta charset="utf-8"><title>Hello World</title></head>
 <body style="font-family: sans-serif; margin: 3rem;">
   <h1>Hello World!</h1>
-  <p>Ausgeliefert von Webserver <b>$(hostname)</b> hinter dem OVH Load Balancer.</p>
-  <p><a href="/db">Datenbank-Verbindung testen &rarr;</a></p>
+  <p>Served by web server <b>$(hostname)</b> behind the OVHcloud load balancer.</p>
+  <p><a href="/db">Test database connection &rarr;</a></p>
 </body>
 </html>
 HTML
@@ -50,16 +50,16 @@ app.get('/db', async (req, res) => {
     const ver = await pool.request().query('SELECT @@VERSION AS v');
     res.send(
       '<h1>' + msg.recordset[0].message + '</h1>' +
-      '<p>Gelesen von SQL Server auf ' + process.env.DB_HOST + '</p>' +
+      '<p>Read from SQL Server on ' + process.env.DB_HOST + '</p>' +
       '<pre>' + ver.recordset[0].v + '</pre>' +
-      '<p><a href="/">&larr; zurück</a></p>'
+      '<p><a href="/">&larr; back</a></p>'
     );
   } catch (err) {
-    res.status(500).send('<h1>DB-Fehler</h1><pre>' + err.message + '</pre>');
+    res.status(500).send('<h1>Database error</h1><pre>' + err.message + '</pre>');
   }
 });
 
-app.listen(3000, '127.0.0.1', () => console.log('helloapp läuft auf :3000'));
+app.listen(3000, '127.0.0.1', () => console.log('helloapp listening on :3000'));
 JS
 
 cat > /etc/helloapp.env <<ENV
@@ -106,4 +106,4 @@ NGINX
 systemctl daemon-reload
 systemctl enable --now helloapp
 systemctl restart nginx
-echo "Web-Init fertig."
+echo "Web init done."
